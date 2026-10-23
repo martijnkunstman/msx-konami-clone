@@ -14,6 +14,9 @@ const SCC = (() => {
     bass:  n => { const t = n < 16 ? n / 8 - 1 : 3 - n / 8; return Math.max(-0.75, Math.min(0.75, t)) / 0.75; },
     pulse: n => (n < 8 ? 1 : -1),                                      // 25% puls voor arpeggio's
     bell:  n => Math.sin(2 * Math.PI * n / 32) * 0.6 + Math.sin(6 * Math.PI * n / 32) * 0.4,
+    // stage 2: scherpe 'horn' en hol orgel
+    horn:  n => (n < 6 ? 1 : n < 16 ? 0.2 : -0.7) + Math.sin(2 * Math.PI * n / 32) * 0.3,
+    organ: n => Math.sin(2 * Math.PI * n / 32) * 0.5 + Math.sin(4 * Math.PI * n / 32) * 0.3 + Math.sin(8 * Math.PI * n / 32) * 0.2,
   };
 
   const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -198,7 +201,8 @@ const SCC = (() => {
     Dm: [2, [0, 3, 7]], D: [2, [0, 4, 7]], C: [0, [0, 4, 7]], C7: [0, [0, 4, 7, 10]],
     Bb: [10, [0, 4, 7]], A: [9, [0, 4, 7]], A7: [9, [0, 4, 7, 10]], F: [5, [0, 4, 7]],
     Gm: [7, [0, 3, 7]], Am: [9, [0, 3, 7]], Em: [4, [0, 3, 7]], B: [11, [0, 4, 7]],
-    B7: [11, [0, 4, 7, 10]],
+    B7: [11, [0, 4, 7, 10]], E: [4, [0, 4, 7]], E7: [4, [0, 4, 7, 10]], Cm: [0, [0, 3, 7]],
+    Eb: [3, [0, 4, 7]],
   };
   // halve maat = 8 zestienden
   function bassLine(chords, base = 36, sixteenths = false) {
@@ -262,7 +266,41 @@ const SCC = (() => {
     '>e d c< b a g f+ g | a f+ d+ f+ b2 | >c< b a g f+ e d+ f+ | e2 d+4 f+4');
   const BOSS_CHORDS = ['Em', 'Em', 'Em', 'B7', 'Em', 'Am', 'B7', 'B7', 'C', 'Am', 'B7', 'B7', 'Am', 'B7', 'Em', 'B7'];
 
+  // Stage 2 "Land of Fire": A harmonisch mineur, opzwepend, 16 maten
+  const FIRE_LEAD = mml(
+    'l8 o5 a4 b o6 c d o5 b o6 c4 | o5 b4 g+ e a2 | o5 a4 b o6 c d e f e | o6 d4 c o5 b o6 c2 |' +
+    'o6 e4 f e d c o5 b a | o5 g+4 a b e2 | o5 f4 e d c4 d e | o5 e2. r4 |' +
+    'o6 a4 g+ f e4 d c | o5 b4 o6 c d o5 g+2 | o6 f4 e d c4 o5 b a | o5 b2 e2 |' +
+    'o5 a o6 c e a g+ e c o5 b | o6 c e a o7 c o6 b g+ e d | o6 c4 o5 b4 a4 g+4 | o5 a2. r4');
+  const FIRE_CHORDS = ['Am', 'Am', 'E', 'Am', 'Am', 'F', 'Dm', 'Am', 'Am', 'Dm', 'E', 'E', 'Dm', 'Am', 'E', 'E',
+    'F', 'Am', 'E', 'E', 'Dm', 'Am', 'E', 'E', 'Am', 'Am', 'Am', 'E7', 'Am', 'E', 'Am', 'Am'];
+  // Eindbaas 2: D-mineur met frygische wending, 8 maten
+  const SERP_LEAD = mml(
+    'l8 o5 d4 e- d c o4 b- a g | o4 a4 b- o5 c+ d2 | o5 f4 g f e- d c o4 b- | o4 a4 g f+ g2 |' +
+    'o5 d f a o6 d c o5 b- a g | o5 a4 b- a g4 f e- | o5 d4 e- f g f e- d | o5 c+2 o4 a2');
+  const SERP_CHORDS = ['Dm', 'Gm', 'A', 'A', 'Gm', 'Gm', 'D', 'Gm', 'Dm', 'Dm', 'Bb', 'Eb', 'Bb', 'Gm', 'A', 'A'];
+
   const TRACKS = {
+    stage2: {
+      bpm: 160, length: 256, loop: true, ch: [
+        { wave: 'horn', vol: 0.28, env: LEAD_ENV, ev: FIRE_LEAD },
+        { wave: 'organ', vol: 0.10, env: LEAD_ENV, ev: echo(FIRE_LEAD, 2).map(e => ({ ...e, n: e.n - 12 })) },
+        { wave: 'bass', vol: 0.34, env: BASS_ENV, gate: 0.7, ev: bassLine(FIRE_CHORDS, 36, true) },
+        { wave: 'pulse', vol: 0.07, env: PLUCK, ev: arpLine(FIRE_CHORDS, 72) },
+        { wave: 'organ', vol: 0.09, env: PAD_ENV, gate: 0.98, ev: padLine(FIRE_CHORDS, 60, 2) },
+        { drum: true, vol: 0.32, ev: drumLine(16, true) },
+      ],
+    },
+    boss2: {
+      bpm: 176, length: 128, loop: true, ch: [
+        { wave: 'horn', vol: 0.30, env: LEAD_ENV, ev: SERP_LEAD },
+        { wave: 'lead', vol: 0.10, env: LEAD_ENV, ev: echo(SERP_LEAD, 3) },
+        { wave: 'bass', vol: 0.36, env: BASS_ENV, gate: 0.6, ev: bassLine(SERP_CHORDS, 36, true) },
+        { wave: 'pulse', vol: 0.07, env: PLUCK, ev: arpLine(SERP_CHORDS, 74) },
+        { wave: 'pad', vol: 0.09, env: PAD_ENV, gate: 0.98, ev: padLine(SERP_CHORDS, 60, 1) },
+        { drum: true, vol: 0.36, ev: drumLine(8, true) },
+      ],
+    },
     stage: {
       bpm: 150, length: 256, loop: true, ch: [
         { wave: 'lead', vol: 0.30, env: LEAD_ENV, ev: STAGE_LEAD },
