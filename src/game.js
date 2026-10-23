@@ -316,8 +316,10 @@ function moveX(dx) {
 function updatePlayer() {
   if (P.dead) {
     if (--P.dead === 0) {
-      if (G.lives <= 0) { G.state = 'gameover'; G.timer = 420; saveHi(); SCC.playSong(SCC.TRACKS.gameover); return; }
-      G.lives--;
+      if (!G.infinite) {
+        if (G.lives <= 0) { G.state = 'gameover'; G.timer = 420; saveHi(); SCC.playSong(SCC.TRACKS.gameover); return; }
+        G.lives--;
+      }
       const row = clamp(Math.floor((camY + H - 40) / TS), 0, L.rows - 1);
       const p = boss ? findFree(120, camY + H - 40) : findFree(L.pathAt[row] * TS, camY + H - 40);
       P.x = p.x; P.y = p.y; P.inv = 150;
@@ -529,6 +531,10 @@ function step() {
   pollPad();
   G.t++;
   if (pressed.KeyM) SCC.toggleMute();
+  // cheat: houd G 5 seconden ingedrukt voor oneindige levens
+  G.gHold = keys.KeyG ? (G.gHold || 0) + 1 : 0;
+  if (G.gHold === 300 && !G.infinite) { G.infinite = true; G.cheatMsg = 180; SCC.sfx.extend(); }
+  if (G.cheatMsg) G.cheatMsg--;
   if (pressed.KeyC) { G.crt = !G.crt; document.getElementById('crt').style.display = G.crt ? '' : 'none'; }
   switch (G.state) {
     case 'title':
@@ -669,7 +675,14 @@ function drawHud() {
   text('HI', 140, 2, '#fc5554'); text(pad(G.hi, 7), 158, 2);
   // levens
   g.drawImage(SPR.player[0], 0, 0, 16, 10, 220, 0, 12, 8);
-  text('x' + Math.min(G.lives, 9), 234, 2, '#ffffff');
+  if (G.infinite) {
+    // ∞-teken als pixel-art (het lettertype heeft dit teken niet)
+    text('x', 234, 2, '#ffd84a');
+    g.fillStyle = '#ffd84a';
+    ['.##..##.', '#..##..#', '#..##..#', '.##..##.'].forEach((row, j) => {
+      for (let i = 0; i < 8; i++) if (row[i] === '#') g.fillRect(243 + i, 3 + j, 1, 1);
+    });
+  } else text('x' + Math.min(G.lives, 9), 234, 2, '#ffffff');
   // wapen
   if (P.phoenix) text('PHOENIX', 4, 11, (G.t >> 3) & 1 ? '#ffd84a' : '#ff8c1a');
   else text(WEAPONS[P.weapon] + P.lvl, 4, 11, WCOL[P.weapon]);
@@ -714,10 +727,16 @@ function drawTitle() {
   g.fillStyle = '#d4524d'; g.fillRect(214, 194, 36, 10);
   text('SCC', 232, 195, '#ffffff', 'center');
 }
+function drawCheatMsg() {
+  if (G.cheatMsg && (G.t >> 3) & 1) {
+    g.fillStyle = 'rgba(0,0,0,0.7)'; g.fillRect(0, 60, W, 14);
+    text('INFINITE LIVES!', W / 2, 63, '#ffd84a', 'center');
+  }
+}
 function draw() {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.fillStyle = '#000000'; g.fillRect(0, 0, W, H);
-  if (G.state === 'title') { drawTitle(); return; }
+  if (G.state === 'title') { drawTitle(); drawCheatMsg(); return; }
   if (G.shake) g.setTransform(1, 0, 0, 1, Math.round(rand(-2, 2)), Math.round(rand(-2, 2)));
   drawMap();
   drawItems();
@@ -740,6 +759,7 @@ function draw() {
     text(STAGE_NAMES[(G.stage - 1) % STAGE_NAMES.length], W / 2, 114, '#ffffff', 'center');
   }
   if (G.state === 'play' && G.paused) text('PAUSE', W / 2, 100, '#ffffff', 'center', 16);
+  drawCheatMsg();
   if (G.state === 'clear' && G.timer < 380) {
     g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(0, 84, W, 44);
     text('STAGE CLEAR!', W / 2, 90, '#ffd84a', 'center', 16);
